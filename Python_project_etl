@@ -1,0 +1,131 @@
+def log_progress(log_points):
+    with open('code_log.txt', 'a') as log_file:
+        for point in log_points:
+            log_file.write(f"{point}\n")
+
+# Example usage:
+log_points = ["Task 1 started", "Task 1 completed", "Task 2 started", "Task 2 completed"]
+log_progress(log_points)
+
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
+def extract(url):
+    log_progress(["Task 2 started"])
+
+    # Fetch the HTML content
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Find the table based on the heading
+    table = soup.find('span', {'id': 'By_market_capitalization'}).find_next('table')
+
+    # Extract data into a DataFrame
+    df = pd.read_html(str(table))[0]
+
+    log_progress(["Task 2 completed"])
+
+    return df
+
+# Example usage:
+data_url = "https://en.wikipedia.org/wiki/List_of_largest_banks"
+data_frame = extract(data_url)
+print(data_frame.head())
+
+
+def transform(df, exchange_rate_csv):
+    log_progress(["Task 3 started"])
+
+    # Load exchange rates from CSV
+    exchange_rates = pd.read_csv(exchange_rate_csv)
+
+    # Assuming the 'Bank name' column is the common column for merging
+    df_transformed = pd.merge(df, exchange_rates, left_on='Bank name', right_on='Currency', how='left')
+
+    # Convert Market Capitalization to GBP, EUR, and INR
+    df_transformed['MC_GBP_Billion'] = df_transformed['Market cap (US$ billion)'] * 0.8
+    df_transformed['MC_EUR_Billion'] = df_transformed['Market cap (US$ billion)'] * 0.93
+    df_transformed['MC_INR_Billion'] = df_transformed['Market cap (US$ billion)'] * 82.95
+
+    # Round the values to 2 decimal places
+    df_transformed = df_transformed.round({'MC_GBP_Billion': 2, 'MC_EUR_Billion': 2, 'MC_INR_Billion': 2})
+
+    log_progress(["Task 3 completed"])
+
+    return df_transformed
+
+# Example usage:
+exchange_rate_csv = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMSkillsNetwork-PY0221EN-Coursera/labs/v2/exchange_rate.csv"
+transformed_df = transform(data_frame, exchange_rate_csv)
+print(transformed_df.head())
+
+
+
+def load_to_csv(df, output_csv_path):
+    log_progress(["Task 4 started"])
+
+    # Save the dataframe to a CSV file
+    df.to_csv(output_csv_path, index=False)
+
+    log_progress(["Task 4 completed"])
+
+# Example usage:
+output_csv_path = "./Largest_banks_data.csv"
+load_to_csv(transformed_df, output_csv_path)
+
+
+import sqlite3
+
+def load_to_db(df, db_name, table_name):
+    log_progress(["Task 5 started"])
+
+    # Create a connection to the database
+    conn = sqlite3.connect(db_name)
+
+    # Save the dataframe to an SQL table
+    df.to_sql(table_name, conn, index=False, if_exists='replace')
+
+    # Close the connection
+    conn.close()
+
+    log_progress(["Task 5 completed"])
+
+# Example usage:
+db_name = "Banks.db"
+table_name = "Largest_banks"
+load_to_db(transformed_df, db_name, table_name)
+
+
+def run_queries(db_name, table_name):
+    log_progress(["Task 6 started"])
+
+    # Connect to the database
+    conn = sqlite3.connect(db_name)
+
+    # Example queries
+    query1 = f"SELECT * FROM Largest_banks limit 5;"
+    query2 = f"SELECT AVG(MC_GBP_Billion) FROM Largest_banks limit 5;"
+
+    # Execute queries
+    result1 = pd.read_sql_query(query1, conn)
+    result2 = pd.read_sql_query(query2, conn)
+
+    # Close the connection
+    conn.close()
+
+    log_progress(["Task 6 completed"])
+
+    return result1, result2
+
+# Example usage:
+result1, result2 = run_queries(db_name, table_name)
+print(result1)
+print(result2)
+
+
+# Read and print the contents of the log file
+with open('code_log.txt', 'r') as log_file:
+    log_contents = log_file.read()
+    print(log_contents)
